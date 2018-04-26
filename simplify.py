@@ -128,6 +128,15 @@ def remove_duplicates(primes):
         clean_primes[prime[0]] = prime[1]
     return clean_primes
 
+
+def remove_duplicate_to_list(primes):
+    primes_set = remove_duplicates(primes)
+    new_primes = []
+    for key, value in primes_set.items():
+        new_primes.append([key, value])
+    return new_primes
+
+
 def quine_mc_cluskey(binaries):
     any_latch = False
     result = []
@@ -139,7 +148,9 @@ def quine_mc_cluskey(binaries):
                 result.append(vec)
                 founded_latch = any_latch = True
         if not founded_latch: result.append(binary1)
-    if any_latch: return quine_mc_cluskey(result)
+    if any_latch:
+        print(result)
+        return quine_mc_cluskey(remove_duplicate_to_list(result))
 
     primes = []
     for p, m in (remove_duplicates(result)).items():
@@ -147,14 +158,7 @@ def quine_mc_cluskey(binaries):
     return primes
 
 
-def bitcount(i):
-    res = 0
-    while i > 0:
-        res += i&1
-        i>>=1
-    return res
-
-def convertToLogic(expression):
+def convert_to_logic(expression):
     mainResult = ""
     for vec in expression:
         varCount = 0
@@ -174,24 +178,20 @@ def convertToLogic(expression):
 def check(expr, binaries):
     for result in [evaluate_logic(expr, binary) for binary in binaries]: print(result)
 
-def unate_cover(primes, minTerms):
+
+def petrick_method_optimalization(primes, min_terms):
 
     chart = []
-    for minTerm in minTerms:
+    for min_term in min_terms:
         column = []
         for i in range(len(primes)):
-            #                 print(minTerm[1])
-            #                 print(primes[i][1])
-            if (minTerm[1][0] in primes[i][1]):
+            if min_term[1][0] in primes[i][1]:
                 column.append(i)
-        #             print(column)
         chart.append(column)
-
-    print(chart)
 
     covers = []
     if len(chart) > 0:
-        covers = [set([i]) for i in chart[0]]
+        covers = [{i} for i in chart[0]]
     for i in range(1, len(chart)):
         new_covers = []
         for cover in covers:
@@ -213,26 +213,34 @@ def unate_cover(primes, minTerms):
         primes_in_cover = [primes[prime_index] for prime_index in cover]
         complexity = calculate_complexity(primes_in_cover)
         if complexity < min_complexity:
+            # print(primes_in_cover)
+            # print(complexity)
             min_complexity = complexity
-            result = primes_in_cover
+            best_primes = primes_in_cover
 
-    return min_complexity, result
+    return best_primes
 
-def calculate_complexity(minterms):
 
-    complexity = len(minterms)
-    if complexity == 1:
-        complexity = 0
-    mask = (1 << len(minterms[1][0])) - 1
-    for minterm in minterms:
-        masked = ~minterm[1][1] & mask
-        #            print(masked)
-        term_complexity = bitcount(masked)
-        #            print(term_complexity)
-        if term_complexity == 1:
-            term_complexity = 0
-        complexity += term_complexity
-        complexity += bitcount(~minterm[1][1] & masked)
+def calculate_complexity(primes):
+
+    complexity = len(primes) - 1
+    for prime in primes:
+        tmp_complexity = 0
+        was_xnor = False
+        for i in prime[0]:
+            if i in "1^": tmp_complexity += 1
+            elif i == "0": tmp_complexity += 2
+            elif i == "-": pass
+            elif i == "~":
+                if not was_xnor:
+                    tmp_complexity += 4
+                    was_xnor = True
+                else:
+                    tmp_complexity += 1
+        complexity += tmp_complexity
+
+    print(primes)
+    print(complexity)
 
     return complexity
 
@@ -246,31 +254,31 @@ def main():
     result = quine_mc_cluskey(parsed_binaries)
     # print(result)
     print()
-    expr = convertToLogic(result)
-    #    print(expr)
-    # {'-10', '~-~', '0-0', '11-', '00-', '1-1', '~~-', '-01', '-^^'}
+    expr = convert_to_logic(result)
+
     r = [['~-~', [2, 0, 5, 7]], ['00-', [0, 1]], ['1-1', [5, 7]], ['-01', [1, 5]], ['11-', [6, 7]], ['0-0', [2, 0]],
-         ['~~-', [0, 1, 6, 7]], ['-⨀⨀', [2, 6, 1, 5]], ['-10', [2, 6]]]
+         ['~~-', [0, 1, 6, 7]], ['-^^', [2, 6, 1, 5]], ['-10', [2, 6]]]
     print(r)
-    x, y = unate_cover(r, parsed_binaries)
-    print(y)
+    x = petrick_method_optimalization(r, parsed_binaries)
+    print(x)
 
 
 def minimize():
     # temporary input of expression
-    expr = "(a|b)|(c|a|b)"
+    expr = "(a|b|c|d|e|f|g|h)"
     variables = gev_variables(expr)
     b = binary_generator(len(variables))
     min_terms = [minTerm for minTerm in b if evaluate_logic(expr, minTerm)]
+    print(min_terms)
     parsed_min_terms = parse_minterms(min_terms)
     primes = quine_mc_cluskey(parsed_min_terms)
-    expr = convertToLogic(primes)
+    print(primes)
+    print(convert_to_logic(primes))
+    optimized_primes = petrick_method_optimalization(primes, parsed_min_terms)
+    print(optimized_primes)
+    expr = convert_to_logic(optimized_primes)
     print(expr)
 
 
-
 minimize()
-
-
-
 
