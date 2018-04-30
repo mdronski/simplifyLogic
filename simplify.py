@@ -12,8 +12,6 @@ def get_variables(expression):
 
 
 def validate(expression):
-    variables = string.ascii_lowercase + 'T' + 'F'
-    operators = "~^&|/>"
     state = True
     counter = 0
 
@@ -22,12 +20,16 @@ def validate(expression):
         if char == ')': counter -= 1
         if counter < 0: return False
         if state:
-            if char == '~': state = True
-            elif char in variables: state = False
-            elif char in ')' + operators: return False
+            if char == '~': continue
+            elif char in VARIABLES:
+                state = False
+            elif char in ')' + OPERATORS:
+                return False
         else:
-            if char in operators: state = True
-            elif char in '(' + variables + '~': return False
+            if char in OPERATORS and char != "~":
+                state = True
+            elif char in '(' + VARIABLES + '~':
+                return False
     if counter != 0: return False
     return not state
 
@@ -104,10 +106,10 @@ def substitude_variables(expression, values):
 def evaluate_logic(expression, values):
     if not validate(expression):
         print("ERROR")
-        return False
-    mappedExpr = substitude_variables(convert_to_onp(expression), values)
+        return "ERROR"
+    mapped_expr = substitude_variables(convert_to_onp(expression), values)
     stack = list("")
-    for x in mappedExpr:
+    for x in mapped_expr:
         if x in '01': stack.append(int(x))
         else:
             y1 = not not stack.pop()
@@ -199,16 +201,16 @@ def quine_mc_cluskey(binaries):
     return primes
 
 
-def convert_to_logic(expression):
+def convert_to_logic(expression, variables):
     main_result = ""
     for vec in expression:
         var_count = 0
         result = ""
-        for elem in range(len(vec[0])):
-            if vec[0][elem] == "-": continue
-            if vec[0][elem] == "0":result += "~"
+        for i in range(len(vec[0])):
+            if vec[0][i] == "-": continue
+            if vec[0][i] == "0":result += "~"
             var_count += 1
-            result += string.ascii_lowercase[elem]+"&"
+            result += variables[i] + "&"
         if (var_count > 1) and len(expression) > 1:
             main_result += "(" + result[:-1] + ")|"
         else:
@@ -216,44 +218,44 @@ def convert_to_logic(expression):
     return main_result[:-1]
 
 
-def replace_parenthesis(expression):
-    replaced_expression = list(expression)
-    for i in range(len(replaced_expression)):
-        if replaced_expression[i] == "(":
-            replaced_expression[i] = ")"
-        elif replaced_expression[i] == ")":
-            replaced_expression[i] = "("
-    return "".join(replaced_expression)
+# def replace_parenthesis(expression):
+#     replaced_expression = list(expression)
+#     for i in range(len(replaced_expression)):
+#         if replaced_expression[i] == "(":
+#             replaced_expression[i] = ")"
+#         elif replaced_expression[i] == ")":
+#             replaced_expression[i] = "("
+#     return "".join(replaced_expression)
+#
+#
+# def convert_to_prefix(expression):
+#     reversed_expression = expression[::-1]
+#     reversed_expression = replace_parenthesis(reversed_expression)
+#     onp_expr = convert_to_onp(reversed_expression)
+#     prefix_expr = onp_expr[::-1]
+#     return prefix_expr
+#
+#
+# def validate_reversed_prefix(expr):
+#     counter = 0
+#     for token in expr:
+#         if token in OPERATORS :
+#             if token != "~":
+#                 counter -= 1
+#         else:
+#             counter += 1
+#         if counter <= 0:
+#             return False
+#     return counter == 1
+#
 
-
-def convert_to_prefix(expression):
-    reversed_expression = expression[::-1]
-    reversed_expression = replace_parenthesis(reversed_expression)
-    onp_expr = convert_to_onp(reversed_expression)
-    prefix_expr = onp_expr[::-1]
-    return prefix_expr
-
-
-def validate_reversed_prefix(expr):
-    counter = 0
-    for token in expr:
-        if token in OPERATORS :
-            if token != "~":
-                counter -= 1
-        else:
-            counter += 1
-        if counter <= 0:
-            return False
-    return counter == 1
-
-
-def get_partial_expr(expression, pos):
-    end_pos = pos + 1
-    while not validate_reversed_prefix((expression[pos:end_pos])[::-1]):
-        end_pos += 1
-
-    print(expression[pos:end_pos])
-    return expression[pos:end_pos], end_pos
+# def get_conj_expr(expression, pos):
+#     end_pos = pos + 1
+#     while not validate_reversed_prefix((expression[pos:end_pos])[::-1]):
+#         end_pos += 1
+#
+#     print(expression[pos:end_pos])
+#     return expression[pos:end_pos], end_pos
 
 #
 # def convert_implication(expression):
@@ -261,9 +263,9 @@ def get_partial_expr(expression, pos):
 #     print(prefix_expression)
 #     alternative_pos = prefix_expression.find("|")
 #     print(alternative_pos)
-#     first_expr, sec_pos = get_partial_expr(prefix_expression, alternative_pos + 1)
+#     first_expr, sec_pos = get_conj_expr(prefix_expression, alternative_pos + 1)
 #     print(sec_pos)
-#     second_expr, tmp = get_partial_expr(prefix_expression, sec_pos)
+#     second_expr, tmp = get_conj_expr(prefix_expression, sec_pos)
 #
 #     print(first_expr)
 #     print(second_expr)
@@ -287,48 +289,295 @@ def get_partial_expr(expression, pos):
 #     return "".join(expr_list), was_converted
 
 
-def convert_implication2(expression):
-    was_parenthesis = False
-    while expression[0] == '(' and expression[-1] == ')' and validate(expression[1:-1]):
-        expression = expression[1:-1]
-        was_parenthesis = True
-
-    alter_pos = divide_expression(expression, "|")
-    if alter_pos > 0:
-        first_expr = expression[:alter_pos]
-        second_expr = expression[alter_pos+1:]
+def tree_to_logic(expr, precedence):
+    if type(expr) is not tuple:
+        return expr
+    if expr[0] == '~':
+        if type(expr[1]) is tuple:
+            result = '~(' + tree_to_logic(expr[1], 0) + ')'
+        else:
+            result = '~' + expr[1]
     else:
-        if was_parenthesis:
-            return "(" + expression + ")"
-        return expression
-
-    have_common_variables = set(get_variables(first_expr)) & set(get_variables(second_expr)) != set()
-
-    if have_common_variables:
-        if was_parenthesis:
-            return "(" + convert_implication2(first_expr) + "|" + convert_implication2(second_expr) + ")"
-        return convert_implication2(first_expr) + "|" + convert_implication2(second_expr)
-
-    print(first_expr)
-    print(second_expr)
-
-    if first_expr[0] != "~" and second_expr[0] == "~" and (len(second_expr) == 1 or second_expr[1] == "("):
-        if was_parenthesis:
-            return "(" + convert_implication2(first_expr) + ">" + convert_implication2(second_expr[1:]) + ")"
-        return convert_implication2(first_expr) + ">" + convert_implication2(second_expr[1:])
-
-    if first_expr[0] == "~" and second_expr[0] != "~" and (len(first_expr) == 1 or first_expr[1] == "("):
-        if was_parenthesis:
-            return "(" + convert_implication2(second_expr) + ">" + convert_implication2(first_expr[1:]) + ")"
-        return convert_implication2(second_expr) + ">" + convert_implication2(first_expr[1:])
-
-    if was_parenthesis:
-        return "(" + convert_implication2(first_expr) + "|" + convert_implication2(second_expr) + ")"
-    return convert_implication2(first_expr) + "|" + convert_implication2(second_expr)
+        result = [tree_to_logic(expression, PRECEDENCES[expr[0]]) for expression in expr[1]]
+        result = expr[0].join(result)
+        if precedence >= PRECEDENCES[expr[0]]:
+            result = '(' + result + ')'
+    return result
 
 
-def check(expr, binaries):
-    for result in [evaluate_logic(expr, binary) for binary in binaries]: print(result)
+
+def make_tree(onp_expr):
+    stack = []
+
+    for char in onp_expr:
+
+        if not char in OPERATORS:
+            stack.append(char)
+        else:
+            if char == '~':
+                expr = (char, stack.pop())
+            else:
+                right_expr = [stack.pop()]
+                left_expr = [stack.pop()]
+                expr = (char, left_expr + right_expr)
+            stack.append(expr)
+
+    expr = stack.pop()
+    return expr
+
+
+def find_disjunction(expr):
+    if type(expr) is not tuple:
+        return expr
+    if expr[0] == '~':
+        if expr[1][0] == '&':
+            expr = ('/', expr[1][1])
+    return expr
+
+
+def find_implications(expr):
+    if type(expr) is not tuple:
+        return expr
+    if expr[0] == '|':
+        for i, elem1 in enumerate(expr[1]):
+            for j, elem2 in enumerate(expr[1]):
+                if i != j:
+                    if elem1[0] == '~':
+                        expr[1][i] = ('>',  [elem1[1][0], elem2])
+                        del expr[1][j]
+        if len(expr[1]) == 1:
+            expr = expr[1][0]
+    return expr
+
+
+def check_negation(exp1, exp2):
+    log1 = tree_to_logic(exp1, 0)
+    log2 = tree_to_logic(exp2, 0)
+
+    b = binary_generator(len(get_variables(log1)))
+
+    for binary in b:
+        if evaluate_logic(log1, binary) and evaluate_logic(log2, binary):
+            return False
+
+    return True
+
+
+def check_if_can_be_xor(exp1, exp2):
+    for i1, e1 in enumerate(exp1[1]):
+        has_negation = False
+        for i2, e2 in enumerate(exp2[1]):
+            s1 = set(get_variables(str(e1)))
+            s2 = set(get_variables(str(e2)))
+            if s1 & s2 == s1:
+                if check_negation(e1, e2):
+                    has_negation = True
+        if not has_negation:
+            return False
+    return True
+
+
+def find_xors(expr):
+    if type(expr) is not tuple:
+        return expr
+    if expr[0] == "|":
+        exp1 = expr[1][0]
+        exp2 = expr[1][1]
+        if exp1[0] == "&" and exp2[0] == "&":
+            if check_if_can_be_xor(exp1, exp2):
+                if exp1[1][0] == "~":
+                    expr = ('^', [exp1[1][0][1]] + [exp1[1][1]])
+                else:
+                    expr = ('^', [exp1[1][0]] + [exp1[1][1][1]])
+    return expr
+
+
+def minimize_representation(expr):
+    if type(expr) is not tuple:
+        return expr
+    if expr[0] == '~':
+        ne = (expr[0], minimize_representation(expr[1]))
+    else:
+        ne = (expr[0], [minimize_representation(e) for e in expr[1]])
+    done = False
+    while not done:
+        expr = ne
+        ne = find_disjunction(ne)
+        ne = find_implications(ne)
+        ne = find_xors(ne)
+        if expr == ne:
+            done = True
+
+    return expr
+
+
+#
+# def get_conj_expr(expr, pos):
+#     if expr[pos] != "&":
+#         return [], -1
+#
+#     end_pos = pos
+#
+#     counter = 2
+#     while counter > 0:
+#         end_pos -= 1
+#         if expr[end_pos] == "~":
+#             pass
+#         elif expr[end_pos] in OPERATORS:
+#             counter += 1
+#         else:
+#             counter -= 1
+#
+#     end_pos -= 1
+#     return expr[end_pos+1:pos], end_pos
+#
+#
+# def get_neg_expr(expr, pos):
+#     if expr[pos] != "~":
+#         return [], -1
+#
+#     end_pos = pos
+#
+#     counter = 1
+#     while counter > 0:
+#         end_pos -= 1
+#         if expr[end_pos] == "~":
+#             pass
+#         elif expr[end_pos] in OPERATORS:
+#             counter += 1
+#         else:
+#             counter -= 1
+#
+#     end_pos -= 1
+#     return expr[end_pos+1:pos], end_pos
+#
+#
+# def convert_xor(expr):
+#     onp_expr = convert_to_onp(expr)
+#     print(onp_expr)
+#
+#     alter_pos = divide_expression(onp_expr, "|")
+#
+#     if alter_pos < 0:
+#         return onp_expr
+#
+#     exp1, second_pos = get_conj_expr(onp_expr, alter_pos - 1)
+#     exp2, last_pos = get_conj_expr(onp_expr, second_pos)
+#     last_pos += 1
+#
+#     if not exp1 or not exp2:
+#         return onp_expr
+#
+#     print(exp1)
+#     print(exp2)
+#
+#     if exp1[-1] == "~":
+#         token1, pos = get_neg_expr(exp1, len(exp1) - 1)
+#         if pos == -1:
+#             return onp_expr
+#         token2 = exp1[:pos+1]
+#
+#         s = token2 + "~" + token1
+#         if exp2 == s:
+#             new_expr = onp_expr[:last_pos] + convert_xor(token1) + convert_xor(token2) + "^" + onp_expr[alter_pos + 1:]
+#             print(new_expr)
+#             return new_expr
+#         else:
+#             return expr
+#
+#     else:
+#         token1, pos = get_neg_expr(exp2, len(exp2) - 1)
+#         if pos == -1:
+#             return onp_expr
+#         token2 = exp2[:pos+1]
+#
+#         s = token2 + "~" + token1
+#         if exp1 == s:
+#             new_expr = onp_expr[:last_pos] + convert_xor(token1) + convert_xor(token2) + "^" + onp_expr[alter_pos+1:]
+#             print(new_expr)
+#             return new_expr
+#         else:
+#             return onp_expr
+#
+#     # print(token1)
+#     # print(token2)
+#
+#
+
+
+# def convert_implication(expression):
+#     was_parenthesis = False
+#     while expression[0] == '(' and expression[-1] == ')' and validate(expression[1:-1]):
+#         expression = expression[1:-1]
+#         was_parenthesis = True
+#
+#     alter_pos = divide_expression(expression, "|")
+#     if alter_pos > 0:
+#         first_expr = expression[:alter_pos]
+#         second_expr = expression[alter_pos+1:]
+#     else:
+#         if was_parenthesis:
+#             return "(" + expression + ")"
+#         return expression
+#
+#     have_common_variables = set(get_variables(first_expr)) & set(get_variables(second_expr)) != set()
+#     #
+#     # print(first_expr)
+#     # print(second_expr)
+#
+#     if have_common_variables:
+#         if was_parenthesis:
+#             return "(" + convert_implication(first_expr) + "|" + convert_implication(second_expr) + ")"
+#         return convert_implication(first_expr) + "|" + convert_implication(second_expr)
+#
+#     if first_expr[0] != "~" and second_expr[0] == "~" and (len(second_expr) == 2 or second_expr[1] == "("):
+#         if was_parenthesis:
+#             return "(" + convert_implication(first_expr) + ">" + convert_implication(second_expr[1:]) + ")"
+#         return convert_implication(first_expr) + ">" + convert_implication(second_expr[1:])
+#
+#     if first_expr[0] == "~" and second_expr[0] != "~" and (len(first_expr) == 2 or first_expr[1] == "("):
+#         if was_parenthesis:
+#             return "(" + convert_implication(second_expr) + ">" + convert_implication(first_expr[1:]) + ")"
+#         return convert_implication(second_expr) + ">" + convert_implication(first_expr[1:])
+#
+#     if was_parenthesis:
+#         return "(" + convert_implication(first_expr) + "|" + convert_implication(second_expr) + ")"
+#     return convert_implication(first_expr) + "|" + convert_implication(second_expr)
+
+#
+#
+# def convert_xor(expression):
+#     was_parenthesis = False
+#     while expression[0] == '(' and expression[-1] == ')' and validate(expression[1:-1]):
+#         expression = expression[1:-1]
+#         was_parenthesis = True
+#
+#     alter_pos = divide_expression(expression, "|")
+#     if alter_pos > 0:
+#         first_expr = expression[:alter_pos]
+#         second_expr = expression[alter_pos + 1:]
+#     else:
+#         if was_parenthesis:
+#             return "(" + expression + ")"
+#         return expression
+#
+#     if first_expr[0] != "(" or first_expr[-1] != ")" or second_expr[0] != "(" or second_expr[-1] != ")":
+#         if was_parenthesis:
+#             return "(" + convert_xor(first_expr) + "|" + convert_xor(second_expr) + ")"
+#         return convert_xor(first_expr) + "|" + convert_xor(second_expr)
+
+
+def check_tautology(expr1, expr2):
+    b = binary_generator(len(get_variables(expr1)))
+    min_terms1 = [min_term for min_term in b if evaluate_logic(expr1, min_term)]
+
+    b = binary_generator(len(get_variables(expr2)))
+    min_terms2 = [min_term for min_term in b if evaluate_logic(expr2, min_term)]
+
+    s1 = set(min_terms1)
+    s2 = set(min_terms2)
+
+    return s1 & s2 == s1
 
 
 def petrick_method_optimalization(primes, min_terms):
@@ -419,13 +668,16 @@ def main():
     print(x)
 
 
-def check_if_boolean(min_terms, var_count):
+def check_if_tautology(min_terms, var_count):
     if len(min_terms) == 0:
         print("F")
         return True
-    if len(min_terms) == var_count**2:
+    if len(min_terms) == 2**var_count:
         print("T")
         return True
+
+
+
 
 def minimize(expression):
     # temporary input of expression
@@ -438,23 +690,42 @@ def minimize(expression):
     variables = get_variables(expr)
     b = binary_generator(len(variables))
     min_terms = [minTerm for minTerm in b if evaluate_logic(expr, minTerm)]
-#    print(min_terms)
-    if check_if_boolean(min_terms, len(variables)):
+    print(sorted(min_terms))
+
+    if check_if_tautology(min_terms, len(variables)):
         return
+
     parsed_min_terms = parse_minterms(min_terms)
     primes = quine_mc_cluskey(parsed_min_terms)
     print(primes)
-    print(convert_to_logic(primes))
+    print(convert_to_logic(primes, variables))
     optimized_primes = petrick_method_optimalization(primes, parsed_min_terms)
     print(optimized_primes)
-    expr = convert_to_logic(optimized_primes)
+    expr = convert_to_logic(optimized_primes, variables)
+
     print(expr)
+
     return expr
 
 
-# convert_implication("(a^c)|~(b&d)")
+# x = "a|~(b&c)"
+# y = "a|~b"
+# # exp = minimize(x)
+# print(x)
+# tree = make_tree(convert_to_onp(x))
+# print(tree)
+# x2 = minimize(x)
+# print(x2)
+# tree = make_tree(convert_to_onp(x2))
+# tree2 = minimize_representation(tree)
+# print(tree2)
+# log = tree_to_logic(tree2, 0)
+# log = log.replace(")", "")
+# log = log.replace("(", "")
+# print(log)
+# print(check_tautology(x, log))
 
-# print("~(a^c)|(b|~d&c)")
-# print(convert_implication2("~(a^c)|(b|~(d&c))"))
-x = minimize("(~(a&c)|(b|~(d&c)))/(e&f/(a&c)|b&d)")
-print(convert_implication2(x))
+# x = "~a|~~b"
+# x = minimize(x)
+# print(x)
+# print(minimize_representation(x))
