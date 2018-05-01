@@ -16,12 +16,16 @@ def validate(expression):
     counter = 0
 
     for char in expression:
-        if char == '(': counter += 1
-        if char == ')': counter -= 1
-        if counter < 0: return False
+        if char == '(':
+            counter += 1
+        if char == ')':
+            counter -= 1
+        if counter < 0:
+            return False
         if state:
-            if char == '~': continue
-            elif char in VARIABLES:
+            if char == '~':
+                continue
+            elif char in VARIABLES + BOOLEANS:
                 state = False
             elif char in ')' + OPERATORS:
                 return False
@@ -42,27 +46,6 @@ def divide_expression(expression, operators):
         if expression[i] in operators and counter == 0: return i
     return -1
 
-#
-# def onp(expression):
-#     binary_operators = "^&|/>"
-#     while expression[0] == '(' and expression[-1] == ')' and validate(expression[1:-1]):
-#         expression = expression[1:-1]
-#
-#     for p in [result for result in [divide_expression(expression, operator) for operator in binary_operators] if result >= 0]:
-#         print(onp(expression[:p]) + onp(expression[p + 1:]) + expression[p])
-#         return onp(expression[:p]) + onp(expression[p + 1:]) + expression[p]
-#
-#     p = divide_expression(expression, '~')
-#     if p >= 0:
-#         print(p)
-#         print(expression)
-#         print(onp(expression[p + 1:]))
-#         print(expression[p])
-#         print(onp(expression[p:]) + expression[p])
-#         return onp(expression[p + 1:]) + expression[p]
-#
-#     return expression
-
 
 def convert_to_onp(expression):
     # shunting-yard algorithm
@@ -74,7 +57,7 @@ def convert_to_onp(expression):
             onp_expression += char
         if char in OPERATORS:
             while operands_stack and operands_stack[-1] in OPERATORS and \
-                    (PRECEDENCES[char] < PRECEDENCES[operands_stack[-1]]  or
+                    (PRECEDENCES[char] < PRECEDENCES[operands_stack[-1]] or
                      operands_stack[-1] == "~" and PRECEDENCES[operands_stack[-1]] > PRECEDENCES[char]):
                 onp_expression += operands_stack.pop()
             operands_stack.append(char)
@@ -89,10 +72,14 @@ def convert_to_onp(expression):
     return onp_expression
 
 
-def substitude_variables(expression, values):
+def substitute_variables(expression, values):
     mapped_expr = list(expression)
     variables = get_variables(expression)
+    # print(variables)
+    # print(values)
     var_mapped = dict(zip(variables, values))
+    # print(var_mapped)
+    # print(mapped_expr)
     for i in range(len(mapped_expr)):
         if mapped_expr[i] in VARIABLES:
             mapped_expr[i] = var_mapped[mapped_expr[i]]
@@ -107,7 +94,7 @@ def evaluate_logic(expression, values):
     if not validate(expression):
         print("ERROR")
         return "ERROR"
-    mapped_expr = substitude_variables(convert_to_onp(expression), values)
+    mapped_expr = substitute_variables(convert_to_onp(expression), values)
     stack = list("")
     for x in mapped_expr:
         if x in '01': stack.append(int(x))
@@ -137,32 +124,25 @@ def binary_generator(n):
 
 def latch(vec1, vec2):
     diff_counter = 0
-    result = ["",[]]  #change
-    for c1, c2 in zip(vec1[0], vec2[0]): #change
+    result = ["",[]]
+    for c1, c2 in zip(vec1[0], vec2[0]):
         if c1 == c2:
-            result[0] += c1 #change
+            result[0] += c1
         else:
             diff_counter += 1
-            result[0] += "-"  #change
+            result[0] += "-"
     if diff_counter == 1:
-        result[1] += (vec1[1] + vec2[1]) #change
+        result[1] += (vec1[1] + vec2[1])
         return result
     else:
         return False
 
 
-def parse_minterms(binaries):
+def parse_minterms(min_terms):
     ordered_binaries = []
-    for binary in binaries:
-        ordered_binaries.append([binary, [int(binary, 2)]])
+    for min_term in min_terms:
+        ordered_binaries.append([min_term, [int(min_term, 2)]])
     return ordered_binaries
-
-
-def read_data(file_name):
-    data = open(file_name, "r")
-    result = set(data.read().splitlines())
-    data.close()
-    return result
 
 
 def remove_duplicates(primes):
@@ -192,7 +172,6 @@ def quine_mc_cluskey(binaries):
                 founded_latch = any_latch = True
         if not founded_latch: result.append(binary1)
     if any_latch:
-        #print(result)
         return quine_mc_cluskey(remove_duplicate_to_list(result))
 
     primes = []
@@ -354,6 +333,8 @@ def check_negation(exp1, exp2):
     log1 = tree_to_logic(exp1, 0)
     log2 = tree_to_logic(exp2, 0)
 
+    if len(get_variables(log1)) != len(get_variables(log2)):
+        return False
     b = binary_generator(len(get_variables(log1)))
 
     for binary in b:
@@ -369,7 +350,7 @@ def check_if_can_be_xor(exp1, exp2):
         for i2, e2 in enumerate(exp2[1]):
             s1 = set(get_variables(str(e1)))
             s2 = set(get_variables(str(e2)))
-            if s1 & s2 == s1:
+            if s1 & s2 == s1 and s1 & s2 == s2:
                 if check_negation(e1, e2):
                     has_negation = True
         if not has_negation:
@@ -385,27 +366,27 @@ def find_xors(expr):
         exp2 = expr[1][1]
         if exp1[0] == "&" and exp2[0] == "&":
             if check_if_can_be_xor(exp1, exp2):
-                if exp1[1][0] == "~":
+                if exp1[1][0][0] == "~":
                     expr = ('^', [exp1[1][0][1]] + [exp1[1][1]])
                 else:
                     expr = ('^', [exp1[1][0]] + [exp1[1][1][1]])
     return expr
 
 
-def minimize_representation(expr):
+def find_shorter_substitutes(expr):
     if type(expr) is not tuple:
         return expr
     if expr[0] == '~':
-        ne = (expr[0], minimize_representation(expr[1]))
+        shortened_expr = (expr[0], find_shorter_substitutes(expr[1]))
     else:
-        ne = (expr[0], [minimize_representation(e) for e in expr[1]])
+        shortened_expr = (expr[0], [find_shorter_substitutes(e) for e in expr[1]])
     done = False
     while not done:
-        expr = ne
-        ne = find_disjunction(ne)
-        ne = find_implications(ne)
-        ne = find_xors(ne)
-        if expr == ne:
+        expr = shortened_expr
+        shortened_expr = find_disjunction(shortened_expr)
+        shortened_expr = find_implications(shortened_expr)
+        shortened_expr = find_xors(shortened_expr)
+        if expr == shortened_expr:
             done = True
 
     return expr
@@ -567,7 +548,7 @@ def minimize_representation(expr):
 #         return convert_xor(first_expr) + "|" + convert_xor(second_expr)
 
 
-def check_tautology(expr1, expr2):
+def check(expr1, expr2):
     b = binary_generator(len(get_variables(expr1)))
     min_terms1 = [min_term for min_term in b if evaluate_logic(expr1, min_term)]
 
@@ -577,7 +558,28 @@ def check_tautology(expr1, expr2):
     s1 = set(min_terms1)
     s2 = set(min_terms2)
 
-    return s1 & s2 == s1
+    return s1 & s2 == s1 and s1 & s2 == s2
+
+
+def remove_redundant_parenthesis(expr):
+    for i in range(len(expr)):
+        if i >= len(expr):
+            break
+        if expr[i] == "(":
+            j = i
+            counter = 1
+            while counter > 0:
+                j += 1
+                if expr[j] == "(":
+                    counter += 1
+                elif expr[j] == ")":
+                    counter -= 1
+                else:
+                    pass
+            tmp_expr = expr[:i] + expr[i+1:j] + expr[j+1:]
+            if check(expr, tmp_expr):
+                expr = tmp_expr
+    return expr
 
 
 def petrick_method_optimalization(primes, min_terms):
@@ -614,8 +616,6 @@ def petrick_method_optimalization(primes, min_terms):
         primes_in_cover = [primes[prime_index] for prime_index in cover]
         complexity = calculate_complexity(primes_in_cover)
         if complexity < min_complexity:
-            # print(primes_in_cover)
-            # print(complexity)
             min_complexity = complexity
             best_primes = primes_in_cover
 
@@ -627,45 +627,18 @@ def calculate_complexity(primes):
     complexity = len(primes) - 1
     for prime in primes:
         tmp_complexity = 0
-        was_xnor = False
         for i in prime[0]:
-            if i in "1^": tmp_complexity += 1
+            if i in "1": tmp_complexity += 1
             elif i == "0": tmp_complexity += 2
             elif i == "-": pass
-            elif i == "~":
-                if not was_xnor:
-                    tmp_complexity += 4
-                    was_xnor = True
-                else:
-                    tmp_complexity += 1
         complexity += tmp_complexity
-    #
-    # print(primes)
-    # print(complexity)
+
 
     return complexity
 
 
 def remove_spaces(expression):
     return expression.replace(" ", "")
-
-
-def main():
-    binaries = read_data("data.txt")
-    binaries = {"000", "001", "010", "101", "110", "111"}
-    # print(binaries)
-    parsed_binaries = parse_minterms(binaries)
-    print()
-    result = quine_mc_cluskey(parsed_binaries)
-    # print(result)
-    print()
-    expr = convert_to_logic(result)
-
-    r = [['~-~', [2, 0, 5, 7]], ['00-', [0, 1]], ['1-1', [5, 7]], ['-01', [1, 5]], ['11-', [6, 7]], ['0-0', [2, 0]],
-         ['~~-', [0, 1, 6, 7]], ['-^^', [2, 6, 1, 5]], ['-10', [2, 6]]]
-    print(r)
-    x = petrick_method_optimalization(r, parsed_binaries)
-    print(x)
 
 
 def check_if_tautology(min_terms, var_count):
@@ -677,55 +650,70 @@ def check_if_tautology(min_terms, var_count):
         return True
 
 
+def main(expression):
+    expr1 = ""
+    expr2 = ""
+    expr3 = ""
+    expr4 = ""
+    expr5 = ""
+    min_expr = ""
+    try:
+
+        expr = remove_spaces(expression)
+        if not validate(expr):
+            print("ERROR")
+            return
+        # print(expr)
+        variables = get_variables(expr)
+        b = binary_generator(len(variables))
+        min_terms = [minTerm for minTerm in b if evaluate_logic(expr, minTerm)]
+
+        if check_if_tautology(min_terms, len(variables)):
+            return
+
+        expr2 = tree_to_logic(find_shorter_substitutes(make_tree(convert_to_onp(expr))), 0)
+        # print(expr2)
+
+        parsed_min_terms = parse_minterms(min_terms)
+        primes = quine_mc_cluskey(parsed_min_terms)
+
+        expr3 = convert_to_logic(primes, variables)
+        # print(expr3)
+
+        optimized_primes = petrick_method_optimalization(primes, parsed_min_terms)
+        expr4 = convert_to_logic(optimized_primes, variables)
+        # print(expr4)
+
+        expr5 = tree_to_logic(find_shorter_substitutes(make_tree(convert_to_onp(expr4))), 0)
+        # print(expr5)
 
 
-def minimize(expression):
-    # temporary input of expression
-    expr_raw = "(a^c)|~(b&d)"
-    expr = remove_spaces(expression)
-    if not validate(expr):
-        print("ERROR")
-        return
-    print(expr)
-    variables = get_variables(expr)
-    b = binary_generator(len(variables))
-    min_terms = [minTerm for minTerm in b if evaluate_logic(expr, minTerm)]
-    print(sorted(min_terms))
+        expr_list = [expr, expr2, expr3, expr4, expr5]
+        min_length = 999999
+        for exp in expr_list:
+            if len(exp) < min_length:
+                min_expr = exp
+                min_length = len(exp)
 
-    if check_if_tautology(min_terms, len(variables)):
-        return
+        min_expr = remove_redundant_parenthesis(min_expr)
 
-    parsed_min_terms = parse_minterms(min_terms)
-    primes = quine_mc_cluskey(parsed_min_terms)
-    print(primes)
-    print(convert_to_logic(primes, variables))
-    optimized_primes = petrick_method_optimalization(primes, parsed_min_terms)
-    print(optimized_primes)
-    expr = convert_to_logic(optimized_primes, variables)
+        if check(expr, min_expr):
+            print(expr + " == " + min_expr)
+        else:
+            print(expr + " == " + expr)
 
-    print(expr)
+    except:
 
-    return expr
+        for elem in [expr1, expr2, expr3, expr4, expr5, min_expr]:
+            if elem != "":
+                print(elem)
+                break
 
 
-# x = "a|~(b&c)"
-# y = "a|~b"
-# # exp = minimize(x)
-# print(x)
-# tree = make_tree(convert_to_onp(x))
-# print(tree)
-# x2 = minimize(x)
-# print(x2)
-# tree = make_tree(convert_to_onp(x2))
-# tree2 = minimize_representation(tree)
-# print(tree2)
-# log = tree_to_logic(tree2, 0)
-# log = log.replace(")", "")
-# log = log.replace("(", "")
-# print(log)
-# print(check_tautology(x, log))
+expr_list = ["a<(b&c)", "(a|b)|(c|a|b)", "~(~a|~b)", "~a|~~b", "(p/q)/(p/q)", "(a&~b)|(~a&b)", "a|~a&(b|~b)|F",
+             "((a|b))^d", "((a&c&d)&~(b|e))|(~(a&c&d)&(b|e))"]
+for exp in expr_list:
+    main(exp)
 
-# x = "~a|~~b"
-# x = minimize(x)
-# print(x)
-# print(minimize_representation(x))
+# main(expr_list[-1])
+#
